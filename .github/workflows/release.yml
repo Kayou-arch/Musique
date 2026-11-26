@@ -1,23 +1,15 @@
-name: Release APK
+name: Build APK
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Extraire le projet
-        run: |
-          unzip -oq musique.zip
-          cp -rT musique .
-          rm -rf musique
 
       - uses: actions/setup-java@v4
         with:
@@ -29,27 +21,9 @@ jobs:
           gradle-version: "8.11.1"
 
       - name: Build
-        run: gradle assembleRelease --no-daemon
+        run: gradle assembleDebug --no-daemon
 
-      - name: Signer
-        env:
-          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
-          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-        run: |
-          echo "$KEYSTORE_B64" | base64 -d > release.jks
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          mkdir -p dist
-          APK=$(find . -path '*/build/outputs/apk/*' -name '*-release-unsigned.apk' | head -1)
-          "$BT/zipalign" -p -f 4 "$APK" aligned.apk
-          "$BT/apksigner" sign --ks release.jks --ks-pass env:KS_PASS \
-            --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASS \
-            --out "dist/musique-${GITHUB_REF_NAME}.apk" aligned.apk
-
-      - name: Publier
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: dist/*.apk
-          generate_release_notes: true
+          name: musique-apk
+          path: app/build/outputs/apk/debug/*.apk
